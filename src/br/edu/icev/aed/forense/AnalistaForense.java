@@ -17,7 +17,7 @@ public class AnalistaForense implements AnaliseForenseAvancada {
         //criar um leitor de linhas que vai ler as linas do arquivo de 'log'
         try (BufferedReader br = new BufferedReader(new FileReader(caminhoArquivo))) {
             String linha;
-            /**
+            /*
              * Criar uma variavel booleana para o cabeçalho para
              * poder pular a primeira linha usando um tatamento facil de if els
              */
@@ -35,13 +35,8 @@ public class AnalistaForense implements AnaliseForenseAvancada {
                 //o fim de cada coluna é uma vírgula, então o split vai ser a vírgula
                 String[] coluna = linha.split(",");
 
-                String timestamp = coluna[0].trim();
-                String userId = coluna[1].trim();
                 String sessionId = coluna[2].trim();
                 String actionType = coluna[3].trim();
-                String targetResource = coluna[4].trim();
-                String severityLevel = coluna[5].trim();
-                String bytesTransferred = coluna[6].trim();
 
                 //começo da resolução do desafio propriamente dito
                 if (actionType.equals("LOGIN")) {
@@ -136,7 +131,46 @@ public class AnalistaForense implements AnaliseForenseAvancada {
 
     @Override
     public Map<Long, Long> encontrarPicosTransferencia(String caminhoArquivo) throws IOException {
-        return Map.of();
+        List<Long> timestamps = new ArrayList<>();
+        List<Long> bytesList = new ArrayList<>();
+        Map<Long, Long> picos = new HashMap<>();
+        Stack<Integer> pilha = new Stack<>();
+        // Leitura do arquivo (mesmo código anterior)
+        try (BufferedReader br = new BufferedReader(new FileReader(caminhoArquivo))) {
+            String linha;
+            boolean cabecalho = true;
+            while ((linha = br.readLine()) != null) {
+                if (cabecalho) {
+                    cabecalho = false;
+                    continue;
+                }
+                String[] coluna = linha.split(",");
+                Long timestamp = Long.parseLong(coluna[0].trim());
+                Long bytes = Long.parseLong(coluna[6].trim());
+                timestamps.add(timestamp);
+                bytesList.add(bytes);
+            }
+        }
+
+        // Percorre de trás para frente
+        for (int i = timestamps.size() - 1; i >= 0; i--) {
+            long bytesAtual = bytesList.get(i);
+
+            // Remove da pilha todos com bytes MENORES ou IGUAIS ao atual
+            while (!pilha.isEmpty() && bytesList.get(pilha.peek()) <= bytesAtual) {
+                pilha.pop();
+            }
+
+            // Se a pilha não está vazia, o topo é o próximo maior
+            if (!pilha.isEmpty()) {
+                picos.put(timestamps.get(i), timestamps.get(pilha.peek()));
+            }
+
+            // Adiciona o índice atual à pilha
+            pilha.push(i);
+        }
+
+        return picos;
     }
 
     @Override
