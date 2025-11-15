@@ -238,6 +238,83 @@ public class AnalistaForense implements AnaliseForenseAvancada {
     @Override
     public Optional<List<String>> rastrearContaminacao(String caminhoArquivo, String recursoInicial, String recursoAlvo)
             throws IOException {
+        // vou montar um grafo dirigido: recursoA -> [recursos visitados depois]
+        Map<String, List<String>> adj = new HashMap<>();
+
+        // guardo o último recurso visto por sessão pra ligar A->B na ordem dos eventos
+        Map<String, String> ultimoDaSessao = new HashMap<>();
+        boolean apareceuInicial = false, apareceuAlvo = false;
+
+        // lê o CSV e constroi as arestas do grafo
+        try (BufferedReader br = new BufferedReader(new FileReader(caminhoArquivo))) {
+            String linha;
+            boolean primeira = true;
+
+            while ((linha = br.readLine()) != null) {
+                if (linha.isEmpty()) continue;
+
+                // pula a primeira linha se for o cabeçalho do CSV
+                if (primeira && linha.toUpperCase(Locale.ROOT).startsWith("TIMESTAMP,")) {
+                    primeira = false;
+                    continue;
+                }
+                primeira = false;
+
+                // ordem das colunas no CSV (só pra me lembrar):
+                // 0=timestamp, 1=user, 2=session, 3=action, 4=recurso, 5=severity, 6=bytes
+                String[] c = linha.split(",", 7);
+                if (c.length < 7) continue;
+
+                String sess = c[2];
+                String target = c[4];
+
+                if (target.equals(recursoInicial)) apareceuInicial = true;
+                if (target.equals(recursoAlvo)) apareceuAlvo = true;
+
+                String anterior = ultimoDaSessao.put(sess, target);
+                // se mudou de recurso dentro da mesma sessão, crio uma aresta anterior -> atual
+                if (anterior != null && !anterior.equals(target)) {
+                    adj.computeIfAbsent(anterior, k -> new ArrayList<>()).add(target);
+                }
+            }
+        }
+
+        // caso trivial: origem == destino e esse recurso apareceu no log
+        if (recursoInicial.equals(recursoAlvo) && (apareceuInicial || apareceuAlvo)) {
+            return Optional.of(Collections.singletonList(recursoInicial));
+        }
+
+        // BFS padrão pra achar o caminho mais curto
+        Deque<String> q = new ArrayDeque<>();
+        Set<String> vis = new HashSet<>();
+        Map<String, String> pai = new HashMap<>();
+
+        q.add(recursoInicial);
+        vis.add(recursoInicial);
+
+        boolean achou = false;
+        while (!q.isEmpty()) {
+            String u = q.removeFirst();
+            if (u.equals(recursoAlvo)) { achou = true; break; }
+
+            for (String v : adj.getOrDefault(u, Collections.emptyList())) {
+                if (vis.add(v)) {          // só entra uma vez
+                    pai.put(v, u);         // guardo quem levou até aqui
+                    q.addLast(v);
+                }
+            }
+        }
+
+        if (!achou) return Optional.empty();
+
+        // reconstrói o caminho a partir do destino usando o mapa de pais
+        List<String> caminho = new ArrayList<>();
+        for (String cur = recursoAlvo; cur != null; cur = pai.get(cur)) {
+            caminho.add(cur);
+            if (cur.equals(recursoInicial)) break;
+        }
+        Collections.reverse(caminho);
         return Optional.empty();
+
     }
 }
