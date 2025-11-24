@@ -34,35 +34,36 @@ public class AnalistaForense implements AnaliseForenseAvancada {
                 // o fim de cada coluna é uma vírgula, então o split vai ser a vírgula
                 String[] coluna = linha.split(",");
 
+                String userId = coluna[1].trim();
                 String sessionId = coluna[2].trim();
                 String actionType = coluna[3].trim();
 
                 // começo da resolução do desafio propriamente dito
                 if (actionType.equals("LOGIN")) {
                     // Adquiri os valores da pilha se não estiver vazia
-                    Stack<String> pilha = sessoes.get(sessionId);
+                    Stack<String> pilha = sessoes.get(userId);
                     // caso contrário(estiver vazia) cria uma nova
                     if (pilha == null) {
                         pilha = new Stack<>();
-                        sessoes.put(sessionId, pilha);
+                        sessoes.put(userId, pilha);
                     }
 
-                    // Empilha o ‘login’ quando encontrar
-                    pilha.push(actionType);
+                    // Empilha o ‘login’ quando encontrar  (corrigido: empilhar sessionId)
+                    pilha.push(sessionId);
 
                     // Tratando os casos de ‘login’ sem logout correspondente
                     if (pilha.size() > 1) {
-                        // Anotar o ‘ID’ da sessção que fez ‘login’ sem 'deslogar'
+                        // Anotar o ‘ID’ da sessão que fez ‘login’ sem 'deslogar'
                         sessoesInvalidas.add(sessionId);
                     }
 
                 } else if (actionType.equals("LOGOUT")) {
                     // Adquiri os valores da pilha se não estiver vazia
-                    Stack<String> pilha = sessoes.get(sessionId);
+                    Stack<String> pilha = sessoes.get(userId);
 
                     // Tratando os casos de 'logout' sem ‘login’ correspondente
-                    if (pilha == null || pilha.isEmpty()) {
-                        // Anotar o ‘ID’ da sessção que fez ‘logout’ sem 'deslogar'
+                    if (pilha == null || pilha.isEmpty() || !pilha.peek().equals(sessionId)) {
+                        // Anotar o ‘ID’ da sessão que fez ‘logout’ sem 'deslogar'
                         sessoesInvalidas.add(sessionId);
                     } else {
                         // Remove o ‘login’ do topo da pilha (desempilha)
@@ -80,8 +81,8 @@ public class AnalistaForense implements AnaliseForenseAvancada {
         // Percorrendo todas as sessões abertas no Map
         for (Map.Entry<String, Stack<String>> entry : sessoes.entrySet()) {
             // Se a pilha não está vazia, logo, faltou 'logout' (sessão inválida)
-            if (!entry.getValue().isEmpty()) {
-                sessoesInvalidas.add(entry.getKey()); // Adiciona ao Set de inválidas
+            while (!entry.getValue().isEmpty()) {
+                sessoesInvalidas.add(entry.getValue().pop()); // Adiciona SESSION_ID restante
             }
         }
 
@@ -131,8 +132,9 @@ public class AnalistaForense implements AnaliseForenseAvancada {
 
         // aqui a gente inverte a ordem da fila, pra prioridade ser o maior numero
         // assim, o mais severo (maior nivel) sai primeiro
-        Comparator<Alerta> comparadorSeveridade = (a1, a2) -> Integer.compare(a1.getSeverityLevel(),
-                a2.getSeverityLevel());
+        Comparator<Alerta> comparadorSeveridade = (Alerta a1, Alerta a2) ->
+                Integer.compare(a2.getSeverityLevel(), a1.getSeverityLevel());
+
 
         // cria a fila de prioridade usando o comparador
         PriorityQueue<Alerta> filaDePrioridade = new PriorityQueue<>(comparadorSeveridade);
@@ -314,7 +316,7 @@ public class AnalistaForense implements AnaliseForenseAvancada {
             if (cur.equals(recursoInicial)) break;
         }
         Collections.reverse(caminho);
-        return Optional.empty();
+        return Optional.of(caminho);
 
     }
 }
