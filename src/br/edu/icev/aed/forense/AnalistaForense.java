@@ -208,7 +208,17 @@ public class AnalistaForense implements AnaliseForenseAvancada {
                     cabecalho = false;
                     continue;
                 }
+
+                if(linha.trim().isEmpty()) {
+                    continue;
+                }
+
                 String[] coluna = linha.split(",");
+
+                if(coluna.length < 7) {
+                    continue;
+                }
+
                 Long timestamp = Long.parseLong(coluna[0].trim());
                 Long bytes = Long.parseLong(coluna[6].trim());
                 timestamps.add(timestamp);
